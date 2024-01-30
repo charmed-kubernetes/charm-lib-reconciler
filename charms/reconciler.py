@@ -1,7 +1,7 @@
 import charms.contextual_status as status
 import logging
 
-from ops import BlockedStatus, HookEvent, Object, StoredState, UpdateStatusEvent
+from ops import HookEvent, Object, StoredState, UpdateStatusEvent
 
 
 log = logging.getLogger(__name__)
@@ -10,11 +10,12 @@ log = logging.getLogger(__name__)
 class Reconciler(Object):
     stored = StoredState()
 
-    def __init__(self, charm, reconcile_function):
+    def __init__(self, charm, reconcile_function, exit_status=None):
         super().__init__(charm, "reconciler")
         self.charm = charm
         self.reconcile_function = reconcile_function
         self.stored.set_default(reconciled=False)
+        self.exit_status = exit_status
 
         for event_kind, bound_event in charm.on.events().items():
             if not issubclass(bound_event.event_type, HookEvent):
@@ -29,14 +30,9 @@ class Reconciler(Object):
 
         self.stored.reconciled = False
 
-        with status.context(self.charm.unit):
+        with status.context(self.charm.unit, self.exit_status):
             try:
-                result = self.reconcile_function(event)
+                self.reconcile_function(event)
                 self.stored.reconciled = True
-                return result
-            except Exception as e:
-                # The decision to enter Blocked instead of Error here is going
-                # to be controversial for sure. I think it's worth it to cut
-                # down on try/except boilerplate in reconcile functions.
-                log.exception(e)
-                status.add(BlockedStatus("Failed to reconcile, see debug-log"))
+            except status.ReconcilerError:
+                log.exception("Caught ReconcilerError")
