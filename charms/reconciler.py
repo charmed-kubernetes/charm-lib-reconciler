@@ -1,8 +1,8 @@
-import charms.contextual_status as status
 import logging
 
 from ops import HookEvent, Object, StoredState, UpdateStatusEvent
 
+import charms.contextual_status as status
 
 log = logging.getLogger(__name__)
 
@@ -10,7 +10,13 @@ log = logging.getLogger(__name__)
 class Reconciler(Object):
     stored = StoredState()
 
-    def __init__(self, charm, reconcile_function, exit_status=None):
+    def __init__(
+        self,
+        charm,
+        reconcile_function,
+        exit_status=None,
+        custom_events=None,
+    ):
         super().__init__(charm, "reconciler")
         self.charm = charm
         self.reconcile_function = reconcile_function
@@ -23,6 +29,10 @@ class Reconciler(Object):
             if event_kind == "collect_metrics":
                 continue
             self.framework.observe(bound_event, self.reconcile)
+
+        if custom_events:
+            for event in custom_events:
+                self.framework.observe(event, self.reconcile)
 
     def reconcile(self, event):
         if isinstance(event, UpdateStatusEvent) and self.stored.reconciled:
