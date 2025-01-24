@@ -1,26 +1,36 @@
 import logging
+from typing import Callable, Optional
 
-from ops import HookEvent, Object, StoredState, UpdateStatusEvent
+from ops import BlockedStatus, BoundEvent, HookEvent, Object, CharmBase, EventBase, StatusBase
 
-import charms.contextual_status as status
 
 log = logging.getLogger(__name__)
 
 
-class Reconciler(Object):
-    stored = StoredState()
-
+class ReconcileErrorWithStatus(Exception):
     def __init__(
-        self,
-        charm,
-        reconcile_function,
-        exit_status=None,
-        custom_events=None,
+            self: "ReconcileErrorWithStatus", 
+            message: str, 
+            status: StatusBase,
+        ) -> None:
+        self.status = status
+        self.message = message
+        super().__init__(message)
+
+    def __str__(self: "ReconcileErrorWithStatus") -> str:
+        return f"[{self.status}] {self.message}"
+
+
+class Reconciler(Object):
+    def __init__(
+        self: "Reconciler",
+        charm: CharmBase,
+        reconcile_function: Callable[[EventBase], None],
+        custom_events: Optional[list[BoundEvent]] = None,
+        exit_status: StatusBase = BlockedStatus("Reconcile failed"),
     ):
-        super().__init__(charm, "reconciler")
         self.charm = charm
         self.reconcile_function = reconcile_function
-        self.stored.set_default(reconciled=False)
         self.exit_status = exit_status
 
         for event_kind, bound_event in charm.on.events().items():
@@ -34,15 +44,12 @@ class Reconciler(Object):
             for event in custom_events:
                 self.framework.observe(event, self.reconcile)
 
-    def reconcile(self, event):
-        if isinstance(event, UpdateStatusEvent) and self.stored.reconciled:
+    def reconcile(self: "Reconciler", event: EventBase) -> None:
+        try:
+            self.reconcile_function(event)
+        except ReconcileErrorWithStatus as e:
+            log.exception(f"reconcile failed: {e}")
+            self.charm.unit.status = e.status
             return
 
-        self.stored.reconciled = False
-
-        with status.context(self.charm.unit, self.exit_status):
-            try:
-                self.reconcile_function(event)
-                self.stored.reconciled = True
-            except status.ReconcilerError:
-                log.exception("Caught ReconcilerError")
+        self.charm.unit.status = self.exit_status
