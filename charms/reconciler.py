@@ -1,19 +1,18 @@
 import logging
-
-from ops import HookEvent, Object, StoredState, UpdateStatusEvent
-
+import ops
 import charms.contextual_status as status
+from typing import cast, Callable
 
 log = logging.getLogger(__name__)
 
 
-class Reconciler(Object):
-    stored = StoredState()
+class Reconciler(ops.Object):
+    stored = ops.StoredState()
 
     def __init__(
         self,
-        charm,
-        reconcile_function,
+        charm: ops.CharmBase,
+        reconcile_function: Callable,
         exit_status=None,
         custom_events=None,
     ):
@@ -24,7 +23,7 @@ class Reconciler(Object):
         self.exit_status = exit_status
 
         for event_kind, bound_event in charm.on.events().items():
-            if not issubclass(bound_event.event_type, HookEvent):
+            if not issubclass(bound_event.event_type, ops.HookEvent):
                 continue
             if event_kind == "collect_metrics":
                 continue
@@ -34,8 +33,9 @@ class Reconciler(Object):
             for event in custom_events:
                 self.framework.observe(event, self.reconcile)
 
-    def reconcile(self, event):
-        if isinstance(event, UpdateStatusEvent) and self.stored.reconciled:
+    def reconcile(self, event: ops.EventBase):
+        reconciled_state = cast(bool, self.stored.reconciled)
+        if isinstance(event, ops.UpdateStatusEvent) and reconciled_state:
             return
 
         self.stored.reconciled = False
