@@ -88,15 +88,20 @@ def test_reconcile_reconcile_success(harness, caplog):
 
     # after a successful reconcile, the state should be reconciled==True
     r = harness.charm.reconciler
+    assert "" == caplog.text
     assert r.stored.reconciled is True
-    assert "" in caplog.text
+    assert r.stored._data.dirty is True
+    harness.charm.framework.commit()  # committing the framework, marks the stored data not dirty
 
     # Once reconciled, we shouldn't see the reconcile_function called for update_status
     test_method.reset_mock()
+
     harness.charm.on.update_status.emit()
     test_method.assert_called_once()
     assert test_method.call_args[0][1] == "update_status"
-    assert "" in caplog.text
+    assert "" == caplog.text
+    assert r.stored.reconciled is True
+    assert r.stored._data.dirty is False
 
 
 def test_reconcile_expected_failure(harness, caplog):
@@ -115,4 +120,4 @@ def test_reconcile_unexpected_failure(harness, caplog):
         harness.set_leader(True)
     r = harness.charm.reconciler
     assert r.stored.reconciled is False
-    assert "" in caplog.text
+    assert "" == caplog.text
