@@ -90,6 +90,10 @@ def test_reconcile_reconcile_success(harness, caplog):
     r = harness.charm.reconciler
     assert "" == caplog.text
     assert r.stored.reconciled is True
+
+    # This confirms the reconcile_function changed the stored data
+    # it does dig into the private data, but this is the only 
+    # way to confirm the data was changed
     assert r.stored._data.dirty is True
     harness.charm.framework.commit()  # committing the framework, marks the stored data not dirty
 
@@ -101,6 +105,10 @@ def test_reconcile_reconcile_success(harness, caplog):
     assert test_method.call_args[0][1] == "update_status"
     assert "" == caplog.text
     assert r.stored.reconciled is True
+
+    # This confirms the reconcile_function did not change the stored data
+    # it does dig into the private data, but this is the only 
+    # way to confirm the data was unchanged
     assert r.stored._data.dirty is False
 
 
