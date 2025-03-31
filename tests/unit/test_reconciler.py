@@ -74,7 +74,7 @@ def test_reconciler_initialized(harness):
     ) in observers, "custom_events not observed"
 
 
-def test_reconcile_reconcile_success(harness, caplog):
+def test_reconcile_success(harness, caplog):
     harness.charm.test_method = test_method = mock.MagicMock()
     harness.enable_hooks()
     harness.charm.on.update_status.emit()
